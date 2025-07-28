@@ -1,5 +1,4 @@
 import WhatToDoCard from "@/components/WhatToDoCard";
-import NormalButton from "../components/NormalButton";
 
 const Home = () => {
 
