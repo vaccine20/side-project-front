@@ -4,7 +4,15 @@ import { Checkbox, TextField } from "@mui/material";
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-const WhatToDoItem = () => {
+type ToDoListProps = {
+  id : string
+  title : string
+  check_status : boolean
+  created_at : string
+  updated_at : string
+}
+
+const WhatToDoItem = (props : ToDoListProps) => {
 
   return (
     <div className="flex justify-between items-center h-12 text-xl">
