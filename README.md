@@ -1,13 +1,19 @@
-간단하게 만들어 보는 토이 프로젝트 프론트 소스입니다.
+간단하게 만들어 보는 토이 프로젝트 프론트 입니다.
 
 ** 개발환경 **
+
 node v22
+
 npm v10.9
 
 nextjs
+
 axios
+
 zustand
+
 typescript
+
 material ui
 
 ## 시작(로컬)
