@@ -18,8 +18,10 @@ material ui
 
 ## 시작(로컬)
 
+```bash
 1. npm install
 2. npm run dev
+```
 
 ## 화면 띄우기
 http://localhost:3000
