@@ -1,3 +1,4 @@
+import { TanstackQueryProvider } from '@/utils/queryClient';
 import './styles/globals.css'
 
 export default function RootLayout({
@@ -8,7 +9,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className='bg-gray-200'>
-        {children}
+        <TanstackQueryProvider>
+          {children}
+        </TanstackQueryProvider>
       </body>
     </html>
   );

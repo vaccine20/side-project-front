@@ -70,7 +70,6 @@ const WhatToDoCard = () => {
     axios.post('http://localhost:8000/deleteList', selectedList)
       .then(res => {
         if (res.data.result == '성공') {
-          alert('삭제 성공!');
           getTodolist();
           clearSelectedList();
         } else {
