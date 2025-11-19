@@ -2,42 +2,52 @@ name: Deploy Next.js to EC2
 
 on:
   push:
-    branches:
-      - main   # 메인 브랜치에 push될 때
+    branches: [ "main" ]
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'   # 너의 프로젝트에 맞는 Node 버전
+          node-version: "22"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build Next.js app
+      - name: Build Next.js
         run: npm run build
 
-      - name: Set up SSH
+      - name: Create SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2 via SSH
+      - name: Upload build files to EC2
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /path/to/your/app  # EC2에서의 앱 디렉토리 (너가 서버에 설정한 경로)
-            git pull origin main
-            npm install --production
-            npm run build
-            # PM2가 설치되어 있다고 가정
-            pm2 restart next-app || pm2 start npm --name "next-app" -- start
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_rsa" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            . ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_PATH }}
+
+      - name: SSH into EC2 and restart PM2
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ${{ secrets.EC2_PATH }}
+
+            echo "📦 Installing production dependencies..."
+            npm ci --production
+
+            echo "🚀 Restarting PM2..."
+            pm2 restart side-project-front || pm2 start npm --name "side-project-front" -- start
+
+            pm2 save
           EOF
