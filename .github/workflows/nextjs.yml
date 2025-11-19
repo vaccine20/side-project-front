@@ -23,6 +23,13 @@ jobs:
       - name: Build Next.js
         run: npm run build
 
+      - name: Check EC2
+        run: |
+          echo "EC2_HOST = ${{ secrets.EC2_HOST }}"
+          echo "EC2_SSH_KEY = ${{ secrets.EC2_SSH_KEY }}"
+          echo "EC2_USER = ${{ secrets.EC2_USER }}"
+          echo "EC2_PATH = ${{ secrets.EC2_PATH }}"
+
       - name: Create SSH key
         run: |
           mkdir -p ~/.ssh
