@@ -24,10 +24,11 @@ jobs:
         run: npm run build
 
       - name: Get GCP_VM_INFO
-        run: echo "GCP_VM_HOST = ${{ secrets.GCP_VM_HOST }}"
-        run: echo "GCP_VM_SSH_KEY = ${{ secrets.GCP_VM_SSH_KEY }}"
-        run: echo "GCP_VM_USER = ${{ secrets.GCP_VM_USER }}"
-        run: echo "GCP_VM_PATH = ${{ secrets.GCP_VM_PATH }}"
+        run: |
+          echo "GCP_VM_HOST = ${{ secrets.GCP_VM_HOST }}"
+          echo "GCP_VM_SSH_KEY = ${{ secrets.GCP_VM_SSH_KEY }}"
+          echo "GCP_VM_USER = ${{ secrets.GCP_VM_USER }}"
+          echo "GCP_VM_PATH = ${{ secrets.GCP_VM_PATH }}"
 
       - name: Setup SSH
         run: |
