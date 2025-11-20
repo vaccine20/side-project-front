@@ -1,4 +1,4 @@
-name: Manual Deploy Next.js to GCP VM
+name: 프론트 배포
 
 on:
   workflow_dispatch:
