@@ -1,7 +1,7 @@
-name: Deploy woojung front
+name: Deploy Frontend
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # 수동 실행 전용
     inputs:
       target:
         type: choice
@@ -16,57 +16,62 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # -----------------------------
+      # 1) 소스 체크아웃
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # -----------------------------
+      # 2) Node.js 설치
+      # -----------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Next.js
-        run: npm run build
-
-      - name: Set environment variables based on input
-        id: envselect
+      # -----------------------------
+      # 3) Next.js 빌드
+      # -----------------------------
+      - name: Install dependencies & Build
         run: |
-          echo "선택된 환경: ${{ github.event.inputs.target }}"
+          npm ci
+          npm run build
 
-          if [ "${{ github.event.inputs.target }}" = "dev" ]; then
-            echo "HOST=${{ secrets.DEV_VM_HOST }}" >> $GITHUB_ENV
-            echo "USER=${{ secrets.DEV_VM_USER }}" >> $GITHUB_ENV
-            echo "PATH_DIR=${{ secrets.DEV_VM_PATH }}" >> $GITHUB_ENV
-            echo "${{ secrets.DEV_VM_SSH_KEY }}" > key.pem
-          else
-            echo "HOST=${{ secrets.PRD_VM_HOST }}" >> $GITHUB_ENV
-            echo "USER=${{ secrets.PRD_VM_USER }}" >> $GITHUB_ENV
-            echo "PATH_DIR=${{ secrets.PRD_VM_PATH }}" >> $GITHUB_ENV
-            echo "${{ secrets.PRD_VM_SSH_KEY }}" > key.pem
-          fi
+      # -----------------------------
+      # 4) gcloud 설치 & 서비스 계정 인증
+      # -----------------------------
+      - name: Install gcloud
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.TEST_GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.TEST_GCP_SA_KEY }}
+          export_default_credentials: true
 
-          chmod 600 key.pem
-
-      - name: Setup SSH known hosts
+      # -----------------------------
+      # 5) rsync + IAP SSH로 파일 업로드
+      # -----------------------------
+      - name: Upload files to frontend VM
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
+          # VM IAP SSH용 임시 SSH 구성 가져오기
+          IAP_SSH=$(gcloud compute ssh ${{ secrets.TEST_GCP_VM_NAME }} \
+            --zone=${{ secrets.TEST_GCP_ZONE }} \
+            --tunnel-through-iap \
+            --dry-run \
+            2>&1 | grep "^ssh")
 
-      - name: Upload files to VM
-        run: |
-          rsync -avz --delete \
-            -e "ssh -i key.pem" \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            . $USER@$HOST:$PATH_DIR
+          echo "Detected SSH command: $IAP_SSH"
 
-      - name: Restart PM2 Service
+          # rsync 실행
+          rsync -avz --delete -e "$IAP_SSH" \
+            . ${{ secrets.TEST_GCP_PATH }}
+
+      # -----------------------------
+      # 6) VM 내부에서 PM2로 프론트 재시작
+      # -----------------------------
+      - name: Restart frontend service on VM
         run: |
-          ssh -i key.pem $USER@$HOST << 'EOF'
-            cd $PATH_DIR
-            npm ci --production
-            pm2 restart nextjs-app || pm2 start npm --name "nextjs-app" -- start
-            pm2 save
-          EOF
+          gcloud compute ssh ${{ secrets.TEST_GCP_VM_NAME }} \
+            --zone=${{ secrets.TEST_GCP_ZONE }} \
+            --tunnel-through-iap \
+            --command="cd ${{ secrets.TEST_GCP_PATH }} && npm ci --production && pm2 restart frontend || pm2 start npm --name frontend -- start && pm2 save"
