@@ -1,4 +1,4 @@
-name: 프론트 배포
+name: Deploy woojung front
 
 on:
   workflow_dispatch:
@@ -41,10 +41,10 @@ jobs:
             echo "PATH_DIR=${{ secrets.DEV_VM_PATH }}" >> $GITHUB_ENV
             echo "${{ secrets.DEV_VM_SSH_KEY }}" > key.pem
           else
-            echo "HOST=${{ secrets.PROD_VM_HOST }}" >> $GITHUB_ENV
-            echo "USER=${{ secrets.PROD_VM_USER }}" >> $GITHUB_ENV
-            echo "PATH_DIR=${{ secrets.PROD_VM_PATH }}" >> $GITHUB_ENV
-            echo "${{ secrets.PROD_VM_SSH_KEY }}" > key.pem
+            echo "HOST=${{ secrets.PRD_VM_HOST }}" >> $GITHUB_ENV
+            echo "USER=${{ secrets.PRD_VM_USER }}" >> $GITHUB_ENV
+            echo "PATH_DIR=${{ secrets.PRD_VM_PATH }}" >> $GITHUB_ENV
+            echo "${{ secrets.PRD_VM_SSH_KEY }}" > key.pem
           fi
 
           chmod 600 key.pem
