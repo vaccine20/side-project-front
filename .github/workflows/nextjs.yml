@@ -53,7 +53,6 @@ jobs:
       # -----------------------------
       - name: Upload files to frontend VM
         run: |
-          # VM IAP SSH용 임시 SSH 구성 가져오기
           IAP_SSH=$(gcloud compute ssh ${{ secrets.TEST_GCP_VM_NAME }} \
             --zone=${{ secrets.TEST_GCP_ZONE }} \
             --tunnel-through-iap \
@@ -62,7 +61,6 @@ jobs:
 
           echo "Detected SSH command: $IAP_SSH"
 
-          # rsync 실행
           rsync -avz --delete -e "$IAP_SSH" \
             . ${{ secrets.TEST_GCP_PATH }}
 
