@@ -1,7 +1,7 @@
 name: Deploy Frontend
 
 on:
-  workflow_dispatch:  # 수동 실행 전용
+  workflow_dispatch:
     inputs:
       target:
         type: choice
@@ -39,7 +39,7 @@ jobs:
           npm run build
 
       # -----------------------------
-      # 4) gcloud 설치 & 서비스 계정 인증
+      # 4) gcloud 설치 & SA 인증
       # -----------------------------
       - name: Install gcloud
         uses: google-github-actions/setup-gcloud@v1
@@ -49,37 +49,34 @@ jobs:
           export_default_credentials: true
 
       # -----------------------------
-      # 5) rsync + IAP SSH로 파일 업로드
+      # 5) SSH CONFIG 생성 (ProxyCommand + IAP)
       # -----------------------------
-      - name: Upload files to frontend VM
+      - name: Configure SSH with IAP Proxy
         run: |
-          DRY_RUN_OUTPUT=$(gcloud compute ssh ${{ secrets.TEST_GCP_VM_NAME }} \
-            --zone=${{ secrets.TEST_GCP_ZONE }} \
-            --tunnel-through-iap \
-            --dry-run 2>&1)
+          mkdir -p ~/.ssh
+          echo "Host iap-vm" > ~/.ssh/config
+          echo "  HostName ${{ secrets.TEST_GCP_INTERNAL_IP }}" >> ~/.ssh/config
+          echo "  User ${{ secrets.TEST_GCP_OS_USER }}" >> ~/.ssh/config
+          echo "  ProxyCommand /usr/bin/gcloud compute start-iap-tunnel ${{ secrets.TEST_GCP_VM_NAME }} %p --zone=${{ secrets.TEST_GCP_ZONE }} --project=${{ secrets.TEST_GCP_PROJECT_ID }} --quiet" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
 
-          echo "---- DRY RUN OUTPUT ----"
-          echo "$DRY_RUN_OUTPUT"
+          chmod 600 ~/.ssh/config
 
-          IAP_SSH=$(echo "$DRY_RUN_OUTPUT" | grep -m1 "^ssh")
-
-          if [ -z "$IAP_SSH" ]; then
-            echo "❌ IAP SSH command not detected!"
-            exit 1
-          fi
-
-          echo "Detected SSH command:"
-          echo "$IAP_SSH"
-
-          rsync -avz --delete -e "$IAP_SSH" \
-            . ${{ secrets.TEST_GCP_PATH }}
+          echo "SSH Config created:"
+          cat ~/.ssh/config
 
       # -----------------------------
-      # 6) VM 내부에서 PM2로 프론트 재시작
+      # 6) rsync로 프론트 파일 배포
       # -----------------------------
-      - name: Restart frontend service on VM
+      - name: Upload frontend files via IAP SSH
         run: |
-          gcloud compute ssh ${{ secrets.TEST_GCP_VM_NAME }} \
-            --zone=${{ secrets.TEST_GCP_ZONE }} \
-            --tunnel-through-iap \
-            --command="cd ${{ secrets.TEST_GCP_PATH }} && npm ci --production && pm2 restart frontend || pm2 start npm --name frontend -- start && pm2 save"
+          rsync -avz --delete -e "ssh -F ~/.ssh/config" \
+            . iap-vm:${{ secrets.TEST_GCP_PATH }}
+
+      # -----------------------------
+      # 7) VM 내부에서 PM2 재시작
+      # -----------------------------
+      - name: Restart frontend via IAP SSH
+        run: |
+          ssh -F ~/.ssh/config iap-vm \
+            "cd ${{ secrets.TEST_GCP_PATH }} && npm ci --production && pm2 restart frontend || pm2 start npm --name frontend -- start && pm2 save"
