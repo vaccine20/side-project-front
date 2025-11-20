@@ -53,13 +53,23 @@ jobs:
       # -----------------------------
       - name: Upload files to frontend VM
         run: |
-          IAP_SSH=$(gcloud compute ssh ${{ secrets.TEST_GCP_VM_NAME }} \
+          DRY_RUN_OUTPUT=$(gcloud compute ssh ${{ secrets.TEST_GCP_VM_NAME }} \
             --zone=${{ secrets.TEST_GCP_ZONE }} \
             --tunnel-through-iap \
-            --dry-run \
-            2>&1 | grep "^ssh")
+            --dry-run 2>&1)
 
-          echo "Detected SSH command: $IAP_SSH"
+          echo "---- DRY RUN OUTPUT ----"
+          echo "$DRY_RUN_OUTPUT"
+
+          IAP_SSH=$(echo "$DRY_RUN_OUTPUT" | grep -m1 "^ssh")
+
+          if [ -z "$IAP_SSH" ]; then
+            echo "❌ IAP SSH command not detected!"
+            exit 1
+          fi
+
+          echo "Detected SSH command:"
+          echo "$IAP_SSH"
 
           rsync -avz --delete -e "$IAP_SSH" \
             . ${{ secrets.TEST_GCP_PATH }}
