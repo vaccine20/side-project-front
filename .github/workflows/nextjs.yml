@@ -17,13 +17,13 @@ jobs:
 
     steps:
       # -----------------------------
-      # 1) 소스 체크아웃
+      # 1) Checkout
       # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v3
 
       # -----------------------------
-      # 2) Node.js 설치
+      # 2) Node.js
       # -----------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -31,7 +31,7 @@ jobs:
           node-version: "22"
 
       # -----------------------------
-      # 3) Next.js 빌드
+      # 3) Build Next.js
       # -----------------------------
       - name: Install dependencies & Build
         run: |
@@ -39,7 +39,7 @@ jobs:
           npm run build
 
       # -----------------------------
-      # 4) gcloud 설치 & SA 인증
+      # 4) Install gcloud & Service Account Auth
       # -----------------------------
       - name: Install gcloud
         uses: google-github-actions/setup-gcloud@v1
@@ -49,7 +49,24 @@ jobs:
           export_default_credentials: true
 
       # -----------------------------
-      # 5) SSH CONFIG 생성 (ProxyCommand + IAP)
+      # 5) Force Authentication Activation (중요)
+      # -----------------------------
+      - name: Force Auth Activation
+        run: |
+          echo "Activating service account manually..."
+
+          # 키파일 활성화
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+
+          # 계정명 추출하여 선택
+          SA_EMAIL=$(jq -r '.client_email' <<< '${{ secrets.TEST_GCP_SA_KEY }}')
+          gcloud config set account "$SA_EMAIL"
+
+          echo "Auth accounts:"
+          gcloud auth list
+
+      # -----------------------------
+      # 6) Create SSH Config with IAP
       # -----------------------------
       - name: Configure SSH with IAP Proxy
         run: |
@@ -69,19 +86,19 @@ jobs:
           ls -al "$HOME/.ssh"
           cat "$HOME/.ssh/config"
 
-
       # -----------------------------
-      # 6) rsync로 프론트 파일 배포
+      # 7) Upload Files via IAP SSH (rsync)
       # -----------------------------
       - name: Upload frontend files via IAP SSH
         run: |
+          echo "Uploading files..."
           rsync -avz --delete -e "ssh -F $HOME/.ssh/config" \
             . iap-vm:${{ secrets.TEST_GCP_PATH }}
 
       # -----------------------------
-      # 7) VM 내부에서 PM2 재시작
+      # 8) Restart PM2 on VM
       # -----------------------------
       - name: Restart frontend via IAP SSH
         run: |
-          ssh -F ~/.ssh/config iap-vm \
+          ssh -F $HOME/.ssh/config iap-vm \
             "cd ${{ secrets.TEST_GCP_PATH }} && npm ci --production && pm2 restart frontend || pm2 start npm --name frontend -- start && pm2 save"
