@@ -98,7 +98,8 @@ jobs:
       - name: Upload frontend files via IAP SSH
         run: |
           rsync -avz --delete -e "ssh -F $HOME/.ssh/config" \
-            . iap-vm:${{ secrets.TEST_GCP_PATH }}
+            .next public package.json package-lock.json \
+            iap-vm:${{ secrets.TEST_GCP_PATH }}
 
       # -----------------------------
       # 8) PM2 재시작
