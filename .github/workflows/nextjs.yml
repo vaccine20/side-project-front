@@ -1,4 +1,4 @@
-name: Deploy test
+name: Deploy Frontend
 
 on:
   workflow_dispatch:
@@ -6,9 +6,9 @@ on:
       target:
         type: choice
         description: "배포 환경 선택"
-        options: 
+        options:
           - dev
-          - prd
+          - prod
         required: true
 
 jobs:
@@ -39,7 +39,7 @@ jobs:
           npm run build
 
       # -----------------------------
-      # 4) gcloud 설치
+      # 4) gcloud 설치 & SA 인증
       # -----------------------------
       - name: Install gcloud
         uses: google-github-actions/setup-gcloud@v1
@@ -48,26 +48,44 @@ jobs:
           service_account_key: ${{ secrets.TEST_GCP_SA_KEY }}
           export_default_credentials: true
 
-      # -----------------------------
-      # 5) gcloud active account 설정 (IAP 필수)
-      # -----------------------------
       - name: Activate service account
-        shell: bash
         run: |
-          echo "${{ secrets.TEST_GCP_SA_KEY }}" > $HOME/sa.json
-          gcloud auth activate-service-account --key-file=$HOME/sa.json
-          gcloud config set project ${{ secrets.TEST_GCP_PROJECT_ID }}
+          gcloud auth activate-service-account --key-file=<(echo "${{ secrets.TEST_GCP_SA_KEY }}")
           gcloud config set account ${{ secrets.TEST_GCP_SA_EMAIL }}
 
-          echo "Active account:"
-          gcloud auth list
 
       # -----------------------------
-      # 6) SSH CONFIG 생성 (IAP Proxy)
+      # 5) SSH CONFIG 생성 (ProxyCommand + IAP)
       # -----------------------------
       - name: Configure SSH with IAP Proxy
         run: |
           mkdir -p $HOME/.ssh
+          echo "Host iap-vm" > $HOME/.ssh/config
+          echo "  HostName ${{ secrets.TEST_GCP_INTERNAL_IP }}" >> $HOME/.ssh/config
+          echo "  User ${{ secrets.TEST_GCP_OS_USER }}" >> $HOME/.ssh/config
+          echo "  ProxyCommand gcloud compute start-iap-tunnel ${{ secrets.TEST_GCP_VM_NAME }} %p --zone=${{ secrets.TEST_GCP_ZONE }} --project=${{ secrets.TEST_GCP_PROJECT_ID }} --quiet" >> $HOME/.ssh/config
+          echo "  StrictHostKeyChecking no" >> $HOME/.ssh/config
 
-          echo "Host iap-vm" >> $HOME/.ssh/config
-          echo "  HostName ${{ secrets.TEST_GCP_INTER
+          chmod 600 $HOME/.ssh/config
+
+          echo "--- SSH CONFIG ---"
+          cat $HOME/.ssh/config
+
+
+      # -----------------------------
+      # 6) rsync로 프론트 파일 배포
+      # -----------------------------
+      - name: Upload frontend files via IAP SSH
+        run: |
+          rsync -avz --delete -e "ssh -F $HOME/.ssh/config" \
+            . iap-vm:${{ secrets.TEST_GCP_PATH }}
+
+
+      # -----------------------------
+      # 7) VM 내부에서 PM2 재시작
+      # -----------------------------
+      - name: Restart frontend via IAP SSH
+        run: |
+          ssh -F $HOME/.ssh/config iap-vm \
+            "cd ${{ secrets.TEST_GCP_PATH }} && npm ci --production && pm2 restart frontend || pm2 start npm --name frontend -- start && pm2 save"
+
