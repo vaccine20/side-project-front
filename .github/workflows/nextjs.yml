@@ -1,4 +1,4 @@
-name: Deploy Frontend
+name: Deploy test
 
 on:
   workflow_dispatch:
@@ -6,7 +6,9 @@ on:
       target:
         type: choice
         description: "배포 환경 선택"
-        options: [dev, prod]
+        options: 
+          - dev
+          - prd
         required: true
 
 jobs:
