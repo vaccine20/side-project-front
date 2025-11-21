@@ -53,30 +53,33 @@ jobs:
       # -----------------------------
       - name: Configure SSH with IAP Proxy
         run: |
-          mkdir -p ~/.ssh
-          echo "Host iap-vm" > ~/.ssh/config
-          echo "  HostName ${{ secrets.TEST_GCP_INTERNAL_IP }}" >> ~/.ssh/config
-          echo "  User ${{ secrets.TEST_GCP_OS_USER }}" >> ~/.ssh/config
-          echo "  ProxyCommand /usr/bin/gcloud compute start-iap-tunnel ${{ secrets.TEST_GCP_VM_NAME }} %p --zone=${{ secrets.TEST_GCP_ZONE }} --project=${{ secrets.TEST_GCP_PROJECT_ID }} --quiet" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          mkdir -p $HOME/.ssh
+          echo "Host iap-vm" > $HOME/.ssh/config
+          echo "  HostName ${{ secrets.TEST_GCP_INTERNAL_IP }}" >> $HOME/.ssh/config
+          echo "  User ${{ secrets.TEST_GCP_OS_USER }}" >> $HOME/.ssh/config
+          echo "  ProxyCommand gcloud compute start-iap-tunnel ${{ secrets.TEST_GCP_VM_NAME }} %p --zone=${{ secrets.TEST_GCP_ZONE }} --project=${{ secrets.TEST_GCP_PROJECT_ID }} --quiet" >> $HOME/.ssh/config
+          echo "  StrictHostKeyChecking no" >> $HOME/.ssh/config
 
-          chmod 600 ~/.ssh/config
+          chmod 600 $HOME/.ssh/config
 
-          echo "SSH Config created:"
-          cat ~/.ssh/config
+          echo "--- SSH CONFIG ---"
+          cat $HOME/.ssh/config
+
 
       # -----------------------------
       # 6) rsync로 프론트 파일 배포
       # -----------------------------
       - name: Upload frontend files via IAP SSH
         run: |
-          rsync -avz --delete -e "ssh -F ~/.ssh/config" \
+          rsync -avz --delete -e "ssh -F $HOME/.ssh/config" \
             . iap-vm:${{ secrets.TEST_GCP_PATH }}
+
 
       # -----------------------------
       # 7) VM 내부에서 PM2 재시작
       # -----------------------------
       - name: Restart frontend via IAP SSH
         run: |
-          ssh -F ~/.ssh/config iap-vm \
+          ssh -F $HOME/.ssh/config iap-vm \
             "cd ${{ secrets.TEST_GCP_PATH }} && npm ci --production && pm2 restart frontend || pm2 start npm --name frontend -- start && pm2 save"
+
