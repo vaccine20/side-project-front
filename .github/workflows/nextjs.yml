@@ -53,13 +53,23 @@ jobs:
       # -----------------------------
       - name: Activate service account
         run: |
-          # SA JSON을 깨지 않게 저장
+          # SA JSON을 깨지 않게 파일로 저장
           cat << 'EOF' > $HOME/sa.json
           ${{ secrets.TEST_GCP_SA_KEY }}
           EOF
+
+          # 서비스 계정 활성화
           gcloud auth activate-service-account --key-file=$HOME/sa.json
+
+          # project 설정
           gcloud config set project ${{ secrets.TEST_GCP_PROJECT_ID }}
-          gcloud config set account ${{ secrets.TEST_GCP_SA_EMAIL }}
+
+          # JSON에서 서비스 계정 이메일 자동 추출
+          SA_EMAIL=$(jq -r '.client_email' $HOME/sa.json)
+          echo "Service Account Email: $SA_EMAIL"
+
+          # gcloud active account 설정
+          gcloud config set account "$SA_EMAIL"
 
           echo "Active account:"
           gcloud auth list
