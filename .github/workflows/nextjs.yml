@@ -52,9 +52,11 @@ jobs:
       # 5) gcloud active account 설정 (IAP 필수)
       # -----------------------------
       - name: Activate service account
-        shell: bash
         run: |
-          echo "${{ secrets.TEST_GCP_SA_KEY }}" > $HOME/sa.json
+          # SA JSON을 깨지 않게 저장
+          cat << 'EOF' > $HOME/sa.json
+      ${{ secrets.TEST_GCP_SA_KEY }}
+      EOF
           gcloud auth activate-service-account --key-file=$HOME/sa.json
           gcloud config set project ${{ secrets.TEST_GCP_PROJECT_ID }}
           gcloud config set account ${{ secrets.TEST_GCP_SA_EMAIL }}
