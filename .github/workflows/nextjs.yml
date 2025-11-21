@@ -48,19 +48,28 @@ jobs:
           service_account_key: ${{ secrets.TEST_GCP_SA_KEY }}
           export_default_credentials: true
 
+      # -----------------------------
+      # 5) gcloud active account 설정 (IAP 필수)
+      # -----------------------------
       - name: Activate service account
+        shell: bash
         run: |
-          gcloud auth activate-service-account --key-file=<(echo "${{ secrets.TEST_GCP_SA_KEY }}")
+          echo "${{ secrets.TEST_GCP_SA_KEY }}" > $HOME/sa.json
+          gcloud auth activate-service-account --key-file=$HOME/sa.json
+          gcloud config set project ${{ secrets.TEST_GCP_PROJECT_ID }}
           gcloud config set account ${{ secrets.TEST_GCP_SA_EMAIL }}
 
+          echo "Active account:"
+          gcloud auth list
 
       # -----------------------------
-      # 5) SSH CONFIG 생성 (ProxyCommand + IAP)
+      # 6) SSH CONFIG 생성 (IAP Proxy)
       # -----------------------------
       - name: Configure SSH with IAP Proxy
         run: |
           mkdir -p $HOME/.ssh
-          echo "Host iap-vm" > $HOME/.ssh/config
+
+          echo "Host iap-vm" >> $HOME/.ssh/config
           echo "  HostName ${{ secrets.TEST_GCP_INTERNAL_IP }}" >> $HOME/.ssh/config
           echo "  User ${{ secrets.TEST_GCP_OS_USER }}" >> $HOME/.ssh/config
           echo "  ProxyCommand gcloud compute start-iap-tunnel ${{ secrets.TEST_GCP_VM_NAME }} %p --zone=${{ secrets.TEST_GCP_ZONE }} --project=${{ secrets.TEST_GCP_PROJECT_ID }} --quiet" >> $HOME/.ssh/config
@@ -68,21 +77,19 @@ jobs:
 
           chmod 600 $HOME/.ssh/config
 
-          echo "--- SSH CONFIG ---"
+          echo "SSH config created:"
           cat $HOME/.ssh/config
 
-
       # -----------------------------
-      # 6) rsync로 프론트 파일 배포
+      # 7) rsync로 프론트 배포 (IAP)
       # -----------------------------
       - name: Upload frontend files via IAP SSH
         run: |
           rsync -avz --delete -e "ssh -F $HOME/.ssh/config" \
             . iap-vm:${{ secrets.TEST_GCP_PATH }}
 
-
       # -----------------------------
-      # 7) VM 내부에서 PM2 재시작
+      # 8) PM2 재시작
       # -----------------------------
       - name: Restart frontend via IAP SSH
         run: |
